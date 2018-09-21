@@ -7,16 +7,16 @@ The idea of this notebook is to demonstrate how a list of actions can be used to
 As an example scenario, Let's say that we are monitoring a web application, and we want to identify if a user is a buyer (1) or something else (0).
 
 ## Observable Variables
-To keep this simple, I will limit the possible actions to 4 actions: search, sell, buy, browse.
+To keep this simple, I will limit the possible actions to 4 actions: search, sell, buy, view.
 
 
 
 ```python
 # Defining the tests and their probabilities
 
-likelyhood = {}
+buyer_likelihood = {}
 
-likelyhood['search'] = { # likelihood that a buyer will use the search function
+buyer_likelihood['search'] = { # likelihood that a buyer will use the search function
     1 : { 
         1: 0.6, # P(buyer | search) (True Positive)
         0: 0.3 # P(-buyer | search) (False Positive)
@@ -27,7 +27,7 @@ likelyhood['search'] = { # likelihood that a buyer will use the search function
     }
 }
 
-likelyhood['sell'] = { # likelihoods that a buyer will sell an item
+buyer_likelihood['sell'] = { # likelihoods that a buyer will sell an item
     1 : {
         1: 0.05, # P(buyer | sell) (True Positive)
         0: 0.5 # P(-buyer | sell) (False Positive)
@@ -38,7 +38,7 @@ likelyhood['sell'] = { # likelihoods that a buyer will sell an item
     }
 }
 
-likelyhood['buy'] = { # likelihoods that a buyer will buy an item
+buyer_likelihood['buy'] = { # likelihoods that a buyer will buy an item
     1 : {
         1: 0.3, # P(buyer | buy) (True Positive)
         0: 0.2 # P(-buyer | buy) (False Positive)
@@ -49,7 +49,7 @@ likelyhood['buy'] = { # likelihoods that a buyer will buy an item
     }
 }
 
-likelyhood['view'] = { # likelihoods that a buyer will view the details of an item
+buyer_likelihood['view'] = { # likelihoods that a buyer will view the details of an item
     1 : {
         1: 0.9, # P(buyer | view) (True Positive)
         0: 0.85 # P(-buyer | view) (False Positive)
@@ -91,23 +91,23 @@ def update_probability(prior_probability, test_name, distribution, test_result):
 
 
 ```python
-def analyse_events(prior, events, legals):
+def analyse_events(prior, events, legals, likelihood):
     posterior = prior
     for ee in events:
-        posterior = update_probability(posterior, ee, likelyhood, 1)
-    for ll in legal_actions:
+        posterior = update_probability(posterior, ee, likelihood, 1)
+    for ll in legals:
         if ll not in events:
-            posterior = update_probability(posterior, ll, likelyhood, 0)
+            posterior = update_probability(posterior, ll, likelihood, 0)
     return posterior
 ```
 
 
 ```python
-# List of legal actions
-legal_actions = likelyhood.keys()
-
 # Prior: What is our initial belief that the user is a buyer
 prior = 0.5 
+
+# List of legal actions
+buyer_legal_actions = buyer_likelihood.keys()
 ```
 
 # Updating our bliefs, given evidences
@@ -121,8 +121,9 @@ Let's say that we are observing a chain of events. For each of these events, we 
 events = ['search', 'view', 'search', 'view', 'view', 'buy']
 
 print("Given the evidences '{}', what is the posterior probability that our user is a buyer?".format(",".join(events)))
-posterior = analyse_events(prior, events, legal_actions)
-print("Probability that our user is a buyer is: {:.2f}%".format(100 * posterior))
+
+buyer_posterior = analyse_events(prior, events, buyer_legal_actions, buyer_likelihood)
+print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_posterior))
 ```
 
     Given the evidences 'search,view,search,view,view,buy', what is the posterior probability that our user is a buyer?
@@ -148,9 +149,9 @@ Still, let's see how this model reacts.
 events = ['search', 'view', 'view', 'view', 'sell', 'sell']
 
 print("Given the evidences '{}', what is the posterior probability that our user is a buyer?".format(",".join(events)))
-posterior = analyse_events(prior, events, legal_actions)
-print("Probability that our user is a buyer is: {:.2f}%".format(100 * posterior))
 
+buyer_posterior = analyse_events(prior, events, buyer_legal_actions, buyer_likelihood)
+print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_posterior))
 ```
 
     Given the evidences 'search,view,view,view,sell,sell', what is the posterior probability that our user is a buyer?
@@ -173,8 +174,9 @@ Let's say that our user is actually a hobbyist trying to buy cheap and resell at
 events = ['buy', 'sell', 'view', 'sell', 'buy', 'view']
 
 print("Given the evidences '{}', what is the posterior probability that our user is a buyer?".format(",".join(events)))
-posterior = analyse_events(prior, events, legal_actions)
-print("Probability that our user is a buyer is: {:.2f}%".format(100 * posterior))
+
+buyer_posterior = analyse_events(prior, events, buyer_legal_actions, buyer_likelihood)
+print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_posterior))
 ```
 
     Given the evidences 'buy,sell,view,sell,buy,view', what is the posterior probability that our user is a buyer?
@@ -203,8 +205,9 @@ Because of this, the update_probability function will use a 50%/50% probability,
 events = ['login fail', 'login fail', 'login', 'address change', 'buy', 'logout']
 
 print("Given the evidences '{}', what is the posterior probability that our user is a buyer?".format(",".join(events)))
-posterior = analyse_events(prior, events, legal_actions)
-print("Probability that our user is a buyer is: {:.2f}%".format(100 * posterior))
+
+buyer_posterior = analyse_events(prior, events, buyer_legal_actions, buyer_likelihood)
+print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_posterior))
 ```
 
     Given the evidences 'login fail,login fail,login,address change,buy,logout', what is the posterior probability that our user is a buyer?
@@ -220,6 +223,203 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * posterior)
     Probability that our user is a buyer is: 52.05%
 
 
-The presence of unknown variables should be a huge red flag. That user is doing something that isn't covered by our model. 
+The presence of unknown variables should be a huge red flag that user is doing something that isn't covered by our model. 
 
-We could just ignore these variable because we might think that they are noise, or maybe we could create another probability distribution that addresses these new variables. Doing so however will require an exponential number of values.
+We could just ignore these variable because we might think that they are noise, or maybe we could create another probability distribution that addresses these new variables.
+
+### Add the missing variables to the buyer's likelihood
+
+Let's add the missing variables for the buyer and try again.
+
+
+```python
+buyer_likelihood['login'] = { # likelihood that a fraudster will login
+    1 : { 
+        1: 0.8, # P(fraudster | login) (True Positive)
+        0: 0.6 # P(-fraudster | login) (False Positive)
+    },
+    0: {
+        1: 0.2, # P(fraudster | -login) (True Negative)
+        0: 0.4 # P(-fraudster | -login) (False Negative)
+    }
+}
+
+buyer_likelihood['login fail'] = { # likelihood that a fraudster will fail to login
+    1 : { 
+        1: 0.2, # P(fraudster | login fail) (True Positive)
+        0: 0.9 # P(-fraudster | login fail) (False Positive)
+    },
+    0: {
+        1: 0.8, # P(fraudster | -login fail) (True Negative)
+        0: 0.1 # P(-fraudster | -login fail) (False Negative)
+    }
+}
+
+buyer_likelihood['address change'] = { # likelihood that a fraudster will use the address change function
+    1 : { 
+        1: 0.4, # P(fraudster | address change) (True Positive)
+        0: 0.8 # P(-fraudster | address change) (False Positive)
+    },
+    0: {
+        1: 0.6, # P(fraudster | -address change) (True Negative)
+        0: 0.2 # P(-fraudster | -address change) (False Negative)
+    }
+}
+
+buyer_likelihood['logout'] = { # likelihood that a fraudster will use the logout function
+    1 : { 
+        1: 0.2, # P(fraudster | logout) (True Positive)
+        0: 0.7 # P(-fraudster | logout) (False Positive)
+    },
+    0: {
+        1: 0.8, # P(fraudster | -logout) (True Negative)
+        0: 0.3 # P(-fraudster | -logout) (False Negative)
+    }
+}
+
+```
+
+
+```python
+print("Given the evidences '{}', what is the posterior probability that our user is a buyer?".format(",".join(events)))
+
+buyer_posterior = analyse_events(prior, events, buyer_legal_actions, buyer_likelihood)
+print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_posterior))
+```
+
+    Given the evidences 'login fail,login fail,login,address change,buy,logout', what is the posterior probability that our user is a buyer?
+    	* "login fail" is positive. Prior probability is: 50.00%. Updated probability is: 18.18%
+    	* "login fail" is positive. Prior probability is: 18.18%. Updated probability is: 4.71%
+    	* "login" is positive. Prior probability is: 4.71%. Updated probability is: 6.18%
+    	* "address change" is positive. Prior probability is: 6.18%. Updated probability is: 3.19%
+    	* "buy" is positive. Prior probability is: 3.19%. Updated probability is: 4.71%
+    	* "logout" is positive. Prior probability is: 4.71%. Updated probability is: 1.39%
+    	* "search" is negative. Prior probability is: 1.39%. Updated probability is: 0.80%
+    	* "sell" is negative. Prior probability is: 0.80%. Updated probability is: 1.51%
+    	* "view" is negative. Prior probability is: 1.51%. Updated probability is: 1.01%
+    Probability that our user is a buyer is: 1.01%
+
+
+## Probability distributions for fraudsters
+
+
+```python
+# Here we define probabilities distribution for a fraudsters
+
+fraudster_likelihood = {}
+
+fraudster_likelihood['login'] = { # likelihood that a fraudster will login
+    1 : { 
+        1: 0.6, # P(fraudster | login) (True Positive)
+        0: 0.8 # P(-fraudster | login) (False Positive)
+    },
+    0: {
+        1: 0.4, # P(fraudster | -login) (True Negative)
+        0: 0.2 # P(-fraudster | -login) (False Negative)
+    }
+}
+
+fraudster_likelihood['login fail'] = { # likelihood that a fraudster will fail to login
+    1 : { 
+        1: 0.9, # P(fraudster | login fail) (True Positive)
+        0: 0.2 # P(-fraudster | login fail) (False Positive)
+    },
+    0: {
+        1: 0.1, # P(fraudster | -login fail) (True Negative)
+        0: 0.8 # P(-fraudster | -login fail) (False Negative)
+    }
+}
+
+fraudster_likelihood['address change'] = { # likelihood that a fraudster will use the address change function
+    1 : { 
+        1: 0.8, # P(fraudster | address change) (True Positive)
+        0: 0.4 # P(-fraudster | address change) (False Positive)
+    },
+    0: {
+        1: 0.2, # P(fraudster | -address change) (True Negative)
+        0: 0.6 # P(-fraudster | -address change) (False Negative)
+    }
+}
+
+fraudster_likelihood['logout'] = { # likelihood that a fraudster will use the logout function
+    1 : { 
+        1: 0.7, # P(fraudster | logout) (True Positive)
+        0: 0.2 # P(-fraudster | logout) (False Positive)
+    },
+    0: {
+        1: 0.3, # P(fraudster | -logout) (True Negative)
+        0: 0.8 # P(-fraudster | -logout) (False Negative)
+    }
+}
+
+fraudster_likelihood['search'] = { # likelihood that a fraudster will use the search function
+    1 : { 
+        1: 0.8, # P(fraudster | search) (True Positive)
+        0: 0.6 # P(-fraudster | search) (False Positive)
+    },
+    0: {
+        1: 0.2, # P(fraudster | -search) (True Negative)
+        0: 0.4 # P(-fraudster | -search) (False Negative)
+    }
+}
+
+fraudster_likelihood['sell'] = { # likelihoods that a fraudster will sell an item
+    1 : {
+        1: 0.05, # P(fraudster | sell) (True Positive)
+        0: 0.5 # P(-fraudster | sell) (False Positive)
+    },
+    0: {
+        1: 0.95, # P(fraudster | -sell) (True Negative)
+        0: 0.5 # P(-fraudster | -sell) (False Negative)
+    }
+}
+
+fraudster_likelihood['buy'] = { # likelihoods that a fraudster will buy an item
+    1 : {
+        1: 0.4, # P(fraudster | buy) (True Positive)
+        0: 0.8 # P(-fraudster | buy) (False Positive)
+    },
+    0: {
+        1: 0.6, # P(fraudster | -buy) (True Negative)
+        0: 0.2 # P(-fraudster | -buy) (False Negative)
+    }
+}
+
+fraudster_likelihood['view'] = { # likelihoods that a fraudster will view the details of an item
+    1 : {
+        1: 0.4, # P(fraudster | view) (True Positive)
+        0: 0.85 # P(-fraudster | view) (False Positive)
+    },
+    0: {
+        1: 0.6, # P(fraudster | -view) (True Negative)
+        0: 0.15 # P(-fraudster | -view) (False Negative)
+    }
+}
+```
+
+### Try with a new probability distribution matching for a fraudster's behaviour
+
+
+```python
+events = ['login fail', 'login fail', 'login', 'address change', 'buy', 'logout']
+
+print("Given the evidences '{}', what is the posterior probability that our user is a fraudster?".format(",".join(events)))
+
+# List of legal actions
+fraudster_legal_actions = fraudster_likelihood.keys()
+fraudster_posterior = analyse_events(prior, events, fraudster_legal_actions, fraudster_likelihood)
+print("Probability that our user is a fraudster is: {:.2f}%".format(100 * fraudster_posterior))
+```
+
+    Given the evidences 'login fail,login fail,login,address change,buy,logout', what is the posterior probability that our user is a fraudster?
+    	* "login fail" is positive. Prior probability is: 50.00%. Updated probability is: 81.82%
+    	* "login fail" is positive. Prior probability is: 81.82%. Updated probability is: 95.29%
+    	* "login" is positive. Prior probability is: 95.29%. Updated probability is: 93.82%
+    	* "address change" is positive. Prior probability is: 93.82%. Updated probability is: 96.81%
+    	* "buy" is positive. Prior probability is: 96.81%. Updated probability is: 93.82%
+    	* "logout" is positive. Prior probability is: 93.82%. Updated probability is: 98.15%
+    	* "search" is negative. Prior probability is: 98.15%. Updated probability is: 96.37%
+    	* "sell" is negative. Prior probability is: 96.37%. Updated probability is: 98.06%
+    	* "view" is negative. Prior probability is: 98.06%. Updated probability is: 99.51%
+    Probability that our user is a fraudster is: 99.51%
+
