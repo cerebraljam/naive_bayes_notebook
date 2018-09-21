@@ -1,13 +1,15 @@
 
-# Naive Bayes - Updating probabilities from a list of actions
+# Naive Bayes - Updating a Posterior Probability From A List of Events
 
-The idea of this notebook is to demonstrate how a list of actions can be used to update the probabilities of something being true or not.
+The idea of this notebook is to demonstrate how a list of actions can be used to update the posterior probabilities of something being true or not.
 
 ## Scenario
 As an example scenario, Let's say that we are monitoring a web application, and we want to identify if a user is a buyer (1) or something else (0).
 
 ## Observable Variables
-To keep this simple, I will limit the possible actions to 4 actions: search, sell, buy, view.
+To keep this simple at first, I will limit the possible actions to 4 actions: search, sell, buy, view. 
+
+Regarding the probability distributions, the "pgmpy" library offers built in functionalities to self train a probability distributions from a list of events, but for education purposes, we will guestimate it here.
 
 
 
@@ -110,11 +112,11 @@ prior = 0.5
 buyer_legal_actions = buyer_likelihood.keys()
 ```
 
-# Updating our bliefs, given evidences
+# Updating Our Bliefs, Given Evidences
 
 Let's say that we are observing a chain of events. For each of these events, we want to update our belief about the user.
 
-## Buyer profile
+## Buyer Profile
 
 
 ```python
@@ -137,7 +139,7 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_post
     Probability that our user is a buyer is: 93.12%
 
 
-## Seller profile
+## Seller Profile
 
 Notice that our test is trying to identify if the user is a buyer, not if s/he is a seller.
 If we wanted to know the probability that the user is a seller, we would need different likelihood data.
@@ -165,7 +167,7 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_post
     Probability that our user is a buyer is: 2.04%
 
 
-## Power whatever profile
+## Power "whatever" Profile
 
 Let's say that our user is actually a hobbyist trying to buy cheap and resell at a higher price, and therefore make money over other sellers who are willing to sell for cheaper than they should. How would our model react?
 
@@ -192,7 +194,7 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_post
 
 The probability of our user being a buyer is really low, even if he is buying a lot. This tells us that he is doing something else that doesn't fit the normal behaviour. This could worth investigating.
 
-## What happen if we test with unknown variables?
+## What Happen If We Test With Unknown Events?
 
 Let's say that our user is trying to commit fraud, what would happen?
 
@@ -217,9 +219,9 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_post
     	* "address change" is unknown. Prior probability is: 50.00%. Updated probability is: 50.00%
     	* "buy" is positive. Prior probability is: 50.00%. Updated probability is: 60.00%
     	* "logout" is unknown. Prior probability is: 60.00%. Updated probability is: 60.00%
-    	* "search" is negative. Prior probability is: 60.00%. Updated probability is: 46.15%
-    	* "sell" is negative. Prior probability is: 46.15%. Updated probability is: 61.96%
-    	* "view" is negative. Prior probability is: 61.96%. Updated probability is: 52.05%
+    	* "view" is negative. Prior probability is: 60.00%. Updated probability is: 50.00%
+    	* "sell" is negative. Prior probability is: 50.00%. Updated probability is: 65.52%
+    	* "search" is negative. Prior probability is: 65.52%. Updated probability is: 52.05%
     Probability that our user is a buyer is: 52.05%
 
 
@@ -227,7 +229,7 @@ The presence of unknown variables should be a huge red flag that user is doing s
 
 We could just ignore these variable because we might think that they are noise, or maybe we could create another probability distribution that addresses these new variables.
 
-### Add the missing variables to the buyer's likelihood
+### Add The Missing Variables To The Buyer's Likelihood
 
 Let's add the missing variables for the buyer and try again.
 
@@ -294,13 +296,15 @@ print("Probability that our user is a buyer is: {:.2f}%".format(100 * buyer_post
     	* "address change" is positive. Prior probability is: 6.18%. Updated probability is: 3.19%
     	* "buy" is positive. Prior probability is: 3.19%. Updated probability is: 4.71%
     	* "logout" is positive. Prior probability is: 4.71%. Updated probability is: 1.39%
-    	* "search" is negative. Prior probability is: 1.39%. Updated probability is: 0.80%
-    	* "sell" is negative. Prior probability is: 0.80%. Updated probability is: 1.51%
-    	* "view" is negative. Prior probability is: 1.51%. Updated probability is: 1.01%
+    	* "view" is negative. Prior probability is: 1.39%. Updated probability is: 0.93%
+    	* "sell" is negative. Prior probability is: 0.93%. Updated probability is: 1.76%
+    	* "search" is negative. Prior probability is: 1.76%. Updated probability is: 1.01%
     Probability that our user is a buyer is: 1.01%
 
 
-## Probability distributions for fraudsters
+## Probability Distributions For Fraudsters
+
+After observing our profiles and logs, and investigating the behaviour that our fraudster did, we can create a probability distribution that would make it easier for us to spot it again.
 
 
 ```python
@@ -321,11 +325,11 @@ fraudster_likelihood['login'] = { # likelihood that a fraudster will login
 
 fraudster_likelihood['login fail'] = { # likelihood that a fraudster will fail to login
     1 : { 
-        1: 0.9, # P(fraudster | login fail) (True Positive)
+        1: 0.55, # P(fraudster | login fail) (True Positive)
         0: 0.2 # P(-fraudster | login fail) (False Positive)
     },
     0: {
-        1: 0.1, # P(fraudster | -login fail) (True Negative)
+        1: 0.45, # P(fraudster | -login fail) (True Negative)
         0: 0.8 # P(-fraudster | -login fail) (False Negative)
     }
 }
@@ -397,29 +401,55 @@ fraudster_likelihood['view'] = { # likelihoods that a fraudster will view the de
 }
 ```
 
-### Try with a new probability distribution matching for a fraudster's behaviour
+In prevision that we might want to add more profile, let's put them together in a single dictionary.
+
+
+```python
+likelihood = {}
+
+likelihood['buyer'] = buyer_likelihood
+likelihood['fraudster'] = fraudster_likelihood
+```
+
+### Evaluating the Posterior Probability Of A List of Events Matching A Buyer Or Fraudster Profile
 
 
 ```python
 events = ['login fail', 'login fail', 'login', 'address change', 'buy', 'logout']
 
-print("Given the evidences '{}', what is the posterior probability that our user is a fraudster?".format(",".join(events)))
+print("Given the evidences '{}'...".format(",".join(events)))
+for user,distribution in likelihood.items():
+    print("what is the posterior probability that our user is a {}?".format(user))
 
-# List of legal actions
-fraudster_legal_actions = fraudster_likelihood.keys()
-fraudster_posterior = analyse_events(prior, events, fraudster_legal_actions, fraudster_likelihood)
-print("Probability that our user is a fraudster is: {:.2f}%".format(100 * fraudster_posterior))
+    # List of legal actions
+    legal_actions = likelihood[user].keys()
+    posterior = analyse_events(prior, events, legal_actions, likelihood[user])
+    print("Probability that our user is a {} is: {:.2f}%\n".format(user, 100 * posterior))
 ```
 
-    Given the evidences 'login fail,login fail,login,address change,buy,logout', what is the posterior probability that our user is a fraudster?
-    	* "login fail" is positive. Prior probability is: 50.00%. Updated probability is: 81.82%
-    	* "login fail" is positive. Prior probability is: 81.82%. Updated probability is: 95.29%
-    	* "login" is positive. Prior probability is: 95.29%. Updated probability is: 93.82%
-    	* "address change" is positive. Prior probability is: 93.82%. Updated probability is: 96.81%
-    	* "buy" is positive. Prior probability is: 96.81%. Updated probability is: 93.82%
-    	* "logout" is positive. Prior probability is: 93.82%. Updated probability is: 98.15%
-    	* "search" is negative. Prior probability is: 98.15%. Updated probability is: 96.37%
-    	* "sell" is negative. Prior probability is: 96.37%. Updated probability is: 98.06%
-    	* "view" is negative. Prior probability is: 98.06%. Updated probability is: 99.51%
-    Probability that our user is a fraudster is: 99.51%
+    Given the evidences 'login fail,login fail,login,address change,buy,logout'...
+    what is the posterior probability that our user is a buyer?
+    	* "login fail" is positive. Prior probability is: 50.00%. Updated probability is: 18.18%
+    	* "login fail" is positive. Prior probability is: 18.18%. Updated probability is: 4.71%
+    	* "login" is positive. Prior probability is: 4.71%. Updated probability is: 6.18%
+    	* "address change" is positive. Prior probability is: 6.18%. Updated probability is: 3.19%
+    	* "buy" is positive. Prior probability is: 3.19%. Updated probability is: 4.71%
+    	* "logout" is positive. Prior probability is: 4.71%. Updated probability is: 1.39%
+    	* "view" is negative. Prior probability is: 1.39%. Updated probability is: 0.93%
+    	* "sell" is negative. Prior probability is: 0.93%. Updated probability is: 1.76%
+    	* "search" is negative. Prior probability is: 1.76%. Updated probability is: 1.01%
+    Probability that our user is a buyer is: 1.01%
+    
+    what is the posterior probability that our user is a fraudster?
+    	* "login fail" is positive. Prior probability is: 50.00%. Updated probability is: 73.33%
+    	* "login fail" is positive. Prior probability is: 73.33%. Updated probability is: 88.32%
+    	* "login" is positive. Prior probability is: 88.32%. Updated probability is: 85.01%
+    	* "address change" is positive. Prior probability is: 85.01%. Updated probability is: 91.90%
+    	* "buy" is positive. Prior probability is: 91.90%. Updated probability is: 85.01%
+    	* "logout" is positive. Prior probability is: 85.01%. Updated probability is: 95.20%
+    	* "view" is negative. Prior probability is: 95.20%. Updated probability is: 98.76%
+    	* "sell" is negative. Prior probability is: 98.76%. Updated probability is: 99.34%
+    	* "search" is negative. Prior probability is: 99.34%. Updated probability is: 98.69%
+    Probability that our user is a fraudster is: 98.69%
+    
 
